@@ -20,7 +20,9 @@ Use the correct panel wiring and a suitable regulated 5V supply per Pimoroni's g
 | Tap A | Launch submarine; alternate direction and cycle colours | Advance hour, wrapping 23 → 00 |
 | Tap B | Cycle automatic → day → night → automatic | Advance minute, wrapping 59 → 00 |
 | Hold A for 1.2 seconds | Open clock editor | Save hours/minutes, reset seconds to zero, return |
-| Hold B for 1.2 seconds | No action | Cancel edits and return |
+| Hold B for 1.2 seconds | Toggle clock overlay | Cancel edits and return |
+
+Hold B on the aquarium screen to show or hide a compact 24-hour HH:MM clock in the top-left corner, drawn in front of all aquarium objects. The overlay starts hidden after each restart. An unset clock displays `--:--`; hold A to set it.
 
 Holds do not emit an extra tap. The buttons use 40 ms debounce. Release between actions. Animations are hidden during editing and resume at elapsed animation time. Automatic night hours are 20:00–06:59; an unset clock starts in night mode. Manual palette overrides remain until cycled back to automatic or reset.
 
