@@ -168,6 +168,33 @@ class BackgroundCache:
             self.steps = None
 
 
+# Three-pixel-wide digits keep the clock legible without hiding much scenery.
+_CLOCK_GLYPHS = (
+    (7, 5, 5, 5, 7), (2, 6, 2, 2, 7), (7, 1, 7, 4, 7),
+    (7, 1, 7, 1, 7), (5, 5, 7, 1, 1), (7, 4, 7, 1, 7),
+    (7, 4, 7, 5, 7), (7, 1, 1, 1, 1), (7, 5, 7, 5, 7),
+    (7, 5, 7, 1, 7),
+)
+
+
+def draw_clock(buffer, local, unset=False):
+    """Composite a 21x7 HH:MM badge last, using the scene's indexed palette."""
+    # An opaque dark backing keeps fish and bubbles from obscuring the digits.
+    for y in range(7):
+        for x in range(21):
+            buffer[y * aquarium.WIDTH + x] = 28
+    hour, minute = local[3:5]
+    digits = (hour // 10, hour % 10, minute // 10, minute % 10)
+    for x, digit in zip((1, 5, 13, 17), digits):
+        rows = (0, 0, 7, 0, 0) if unset else _CLOCK_GLYPHS[digit]
+        for y, bits in enumerate(rows):
+            for dx in range(3):
+                if bits & (4 >> dx):
+                    buffer[(y + 1) * aquarium.WIDTH + x + dx] = 42
+    buffer[2 * aquarium.WIDTH + 10] = 42
+    buffer[4 * aquarium.WIDTH + 10] = 42
+
+
 def draw_settings(graphics, board, hour, minute):
     graphics.set_pen(graphics.create_pen(0, 0, 0))
     graphics.clear()
@@ -216,13 +243,14 @@ def main():
     submarine_at = None
     submarine_direction = -1
     submarine_colour = -1
+    show_clock = False
     clock_edit = False
     edit_hour = edit_minute = 0
     screen_dirty = True
     was_screen = False
     print("Fish Tank: 128x64, RGB brightness 80%, target 15 FPS")
     print("Tap A: submarine; tap B: auto/day/night")
-    print("Hold A: clock settings; hold B in editor: cancel")
+    print("Hold A: clock settings; hold B: toggle clock (editor: cancel)")
     print("Clock source: " + clock.source)
     gc.collect()
     try:
@@ -256,6 +284,8 @@ def main():
                         else:
                             edit_minute = (edit_minute + 1) % 60
                         screen_dirty = True
+                elif i == 1 and action == "hold":
+                    show_clock = not show_clock
                 elif action == "tap":
                     if i == 0:
                         submarine_at = seconds
@@ -295,6 +325,8 @@ def main():
             render(seconds, pixel, night=night, submarine_at=submarine_at,
                    submarine_direction=submarine_direction, submarine_colour=submarine_colour, feeding_age=feeding.poll(clock.local(), seconds),
                    background=False, plants=False, ornaments=False)
+            if show_clock:
+                draw_clock(indexed.buffer, clock.local(), clock.source == "unset")
             t1 = ticks_us()
             indexed.draw(pens[int(night)][int(seconds * 1.8) % 4])
             t2 = ticks_us()
