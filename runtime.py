@@ -214,6 +214,11 @@ def main():
     from tank_clock import Clock
     from tank_controls import Buttons
 
+    # Reclaim import/compiler temporaries before large contiguous allocations.
+    gc.collect()
+    baked = aquarium.load_backgrounds()
+    gc.collect()
+
     clock = Clock(machine.RTC(), print)
     feeding = FeedingSchedule(print)
     controls = Buttons()
@@ -224,14 +229,18 @@ def main():
     graphics.set_pen(graphics.create_pen(0, 0, 0))
     graphics.clear()
     board.update()
+    gc.collect()
     pens = make_pens(graphics)
+    gc.collect()
     indexed = IndexedDisplay(graphics)
-    if aquarium.load_backgrounds():
+    if baked:
         background = None
         print("Background: 4 pre-rendered frames, 32 KiB RAM")
     else:
         print("Background fallback: " + str(aquarium._BAKED_ERROR))
+        gc.collect()
         background = BackgroundCache()
+        gc.collect()
         background.initialise(0, clock.night())
     pixel = indexed.pixel
     render = aquarium.render

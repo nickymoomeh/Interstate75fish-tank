@@ -4,6 +4,46 @@ from aquarium import WIDTH, HEIGHT, BASE_PALETTE, palette_at, render
 
 
 class AquariumTests(unittest.TestCase):
+    def test_marine_visitors_colours_and_clipping(self):
+        import aquarium as a
+        self.assertEqual(len(set(a._MARINE_PALETTES)), 6)
+        for start, period, duration in ((205, 360, 44), (95, 290, 56)):
+            for trip in range(6):
+                for age in (0, 1, duration / 2, duration - 1):
+                    pixels = []
+                    a.marine_visitors(start + trip * period + age,
+                                      lambda x, y, i: pixels.append((x, y, i)))
+                    self.assertTrue(all(0 <= x < WIDTH and 0 <= y < HEIGHT and
+                                        0 <= i < len(BASE_PALETTE) for x, y, i in pixels))
+                    if age == duration / 2:
+                        self.assertTrue(pixels)
+        for poses in (a._OCTOPUS_POSES, a._SEAHORSE_POSES):
+            self.assertGreater(len(set(poses)), 1)
+            self.assertTrue(all(set(p[2::3]) <= {0, 1, 2, 3} for p in poses))
+
+    def test_hermit_shell_colours_preserve_shape(self):
+        import aquarium as a
+        shells = a._HERMIT_SHELLS
+        self.assertEqual(len(set(shells)), 6)
+        for shell in shells:
+            self.assertEqual(shell[0::3], a._SHELL[0::3])
+            self.assertEqual(shell[1::3], a._SHELL[1::3])
+
+    def test_angler_lure_has_white_core_and_larger_warm_bulb(self):
+        import aquarium as a
+        import math
+        t = 55.5
+        pixels = []
+        render(t, lambda x, y, i: pixels.append((x, y, i)), night=True, background=False)
+        cx, cy = 64 - 10, 29 + int(2 * math.sin(t * .8)) - 11
+        self.assertIn((cx, cy, a.PEARL_CORE), pixels)
+        for dx, dy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
+            self.assertIn((cx + dx, cy + dy, a.PEARL_HALO), pixels)
+        bulb = [(x, y, i) for x, y, i in pixels
+                if abs(x - cx) <= 1 and abs(y - cy) <= 1 and
+                i in (a.PEARL_CORE, a.TREASURE_GLOW, 57)]
+        self.assertGreaterEqual(len(bulb), 9)
+
     def test_bubbles_have_independent_fixed_colour_phases(self):
         calls = []
         render(0, lambda x, y, i: calls.append((x, y, i)), background=False)
@@ -63,7 +103,7 @@ class AquariumTests(unittest.TestCase):
     def test_hermit_exit_is_fully_offscreen(self):
         import aquarium
         from unittest.mock import patch
-        with patch.object(aquarium, '_SHELL', bytes((0, 0, 81))):
+        with patch.object(aquarium, '_HERMIT_SHELLS', (bytes((0, 0, 81)),) * 6):
             for trip in (0, 1):
                 t = 350 + trip * 540 + 89.9
                 pixels = []
@@ -351,4 +391,3 @@ class AquariumTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

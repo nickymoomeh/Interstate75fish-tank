@@ -108,22 +108,24 @@ class ClockOverlayTests(unittest.TestCase):
         timer=SimpleNamespace(ticks_ms=lambda: next(counter),ticks_us=lambda: next(counter),
                               ticks_diff=lambda a,b:a-b,sleep_ms=lambda _:None)
         snapshots=[]
+        startup=[]
         def capture(display,pens): snapshots.append(bytes(display.buffer))
         def scene(seconds,pixel,**kwargs):
             # A foreground aquarium object occupies the badge's location.
             pixel(0,0,33)
         with patch.dict('sys.modules',{'machine':SimpleNamespace(RTC=lambda:rtc),
-             'interstate75':SimpleNamespace(Interstate75=lambda **_:board,
+             'interstate75':SimpleNamespace(Interstate75=lambda **_: startup.append('display') or board,
               DISPLAY_INTERSTATE75_128X64=0,SWITCH_A=0,SWITCH_B=1)}), \
              patch('tank_controls.Buttons.poll',side_effect=poll), \
              patch.object(runtime,'time',timer), \
              patch.object(runtime.IndexedDisplay,'draw',capture), \
-             patch('aquarium.load_backgrounds',return_value=True), \
+             patch('aquarium.load_backgrounds',side_effect=lambda: startup.append('backgrounds') or True), \
              patch('aquarium.background_frame',return_value=bytes(8192)), \
              patch('aquarium.coral_commands',return_value=b''), \
              patch('aquarium.chest_commands',return_value=b''), \
              patch('aquarium.render',side_effect=scene):
             with self.assertRaises(KeyboardInterrupt): runtime.main()
+        self.assertEqual(startup, ['backgrounds', 'display'])
         self.assertEqual(len(snapshots),3)
         self.assertEqual(snapshots[0][0],28) # Clock draws over the foreground.
         self.assertEqual(snapshots[1],snapshots[0]) # Hold B in editor only cancels.

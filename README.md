@@ -35,3 +35,20 @@ Python 3 with Tkinter and Pillow can run `python3 emulator.py`. Install Pillow w
 Run `python3 -m unittest discover -s tests -v` from this directory. Rebuild the included background asset using `python3 bake_backgrounds.py`; it is generated from the renderer, with palette and payload integrity checks. A damaged or absent asset triggers the procedural background fallback.
 
 See [RELEASE.md](RELEASE.md) for licensing and release gates and [VALIDATION.md](VALIDATION.md) for test scope. Licensed under MIT; see LICENSE. This is a release candidate pending board checks and final provenance review.
+
+## Marine visitors and startup memory
+
+Octopuses and upright seahorses visit in both day and night mode, each cycling
+through six colour schemes. Octopuses pulse forward with animated arms for
+44 seconds every six minutes (first visit at 3:25 after startup). Seahorses drift
+and bob for 56 seconds every 4:50 (first visit at 1:35). Hermit shells also cycle
+through six colours, and the night anglerfish has a larger warm lure with a white
+centre and soft halo. The desktop emulator uses the same artwork and schedules.
+
+Startup collects unused import/compiler memory and loads the four baked
+backgrounds before creating the display and palettes, with collections before
+large allocations. This ports the startup-memory fix verified on the connected
+installation; the offline build still needs its own physical acceptance checks.
+The existing `backgrounds.bin` remains compatible. To update an existing offline
+installation from this version, copy `aquarium.py` and `runtime.py` over USB, then
+reset. No Wi-Fi, NTP, dashboard or remote updater is included.

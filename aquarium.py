@@ -173,6 +173,78 @@ _TINY_GOLD = _sprite(("T HH ", "TTBBE", "T BB "), {"T": 54, "H": 75, "B": 74, "E
 _SHELL = _sprite(("    HHHH   ", "  HHSSSSHH ", " HSSDDSSSH ", " HSDSSDSDSH",
                   " HSDSSDSSH ", "  HSSSSSH  ", "   HHHHH   "),
                  {"H": 75, "S": 74, "D": 58})
+_HERMIT_SHELL_PALETTES = ((74, 75, 58), (72, 73, 36), (70, 71, 59),
+                           (76, 77, 72), (78, 79, 10), (56, 57, 58))
+_HERMIT_SHELLS = tuple(bytes((body if value == 74 else light if value == 75 else
+                              shadow if value == 58 else value) if at % 3 == 2 else value
+                             for at, value in enumerate(_SHELL))
+                       for body, light, shadow in _HERMIT_SHELL_PALETTES)
+
+# Shared role-based artwork: body, highlight, detail, eye. No shape copies
+# are needed for palette changes, and each visitor keeps its colour per trip.
+_MARINE_PALETTES = ((74, 75, 77, 28), (72, 73, 71, 28), (70, 71, 57, 28),
+                    (76, 77, 75, 28), (78, 79, 73, 28), (56, 57, 74, 28))
+
+
+def _octopus_pose(pose):
+    rows = (("    HHHH    ", "   HBBBBH   ", "  HBBBBBBH  ", "  HBEBBEBH  ",
+             "  HBBBBBBH  ", "   BBBBBB   ") if pose % 2 == 0 else
+            ("     HH     ", "    HBBH    ", "   HBBBBH   ", "   HEBBEH   ",
+             "   HBBBBH   ", "   BBBBBB   "))
+    commands = bytearray(_sprite(rows, {"B": 0, "H": 1, "E": 3}))
+    for arm in range(8):
+        for step in range(5):
+            x = 2 + arm + int((arm - 3.5) * step / 5 +
+                              math.sin(pose * 1.57 + arm * .9) * step / 3)
+            commands.append(max(0, x))
+            commands.append(6 + step)
+            commands.append(2 if step == 4 else 0)
+    return bytes(commands)
+
+
+_OCTOPUS_POSES = tuple(_octopus_pose(pose) for pose in range(4))
+_SEAHORSE_POSES = tuple(_sprite(rows, {"B": 0, "H": 1, "F": 2, "E": 3}) for rows in (
+    ("   HHH   ", "  HBBEHH ", "  HBBBBBB", "   HBB   ", "    BB   ", "   HBB   ",
+     "  HBBF   ", "  HBBF   ", "   HBB   ", "    BB   ", "   HBB   ", "  HB B   ",
+     "  H BB   ", "   HH    "),
+    ("   HHH   ", "  HBBEHH ", "  HBBBBBB", "   HBB   ", "    BB   ", "   HBBF  ",
+     "  HBBFF  ", "  HBBF   ", "   HBB   ", "    BB   ", "    HB   ", "   HB B  ",
+     "   H BB  ", "    HH   "),
+))
+
+
+def _blit_roles(sprite, colours, x, y, pixel, direction):
+    for at in range(0, len(sprite), 3):
+        px, py = x + direction * sprite[at], y + sprite[at + 1]
+        if 0 <= px < WIDTH and 0 <= py < HEIGHT:
+            pixel(px, py, colours[sprite[at + 2]])
+
+
+def marine_visitors(seconds, pixel):
+    # Octopus uses pulsed forward motion and a gentle dipping path.
+    age = (seconds - 205) % 360
+    if age < 44:
+        trip = int((seconds - 205) // 360)
+        direction = 1 if trip % 2 == 0 else -1
+        fraction = age / 44
+        eased = fraction + .7 * math.sin(6 * math.pi * fraction) / (6 * math.pi)
+        x = _crossing(eased * 44, 44, 17, direction)
+        y = 33 + int(3 * math.sin(age * .35 + trip))
+        _blit_roles(_OCTOPUS_POSES[int(age * 3) % 4],
+                    _MARINE_PALETTES[trip % len(_MARINE_PALETTES)], x, y, pixel, direction)
+    # Upright seahorses drift, hover and bob instead of cruising like fish.
+    age = (seconds - 95) % 290
+    if age < 56:
+        trip = int((seconds - 95) // 290)
+        direction = 1 if trip % 2 == 0 else -1
+        fraction = age / 56
+        eased = fraction + .9 * math.sin(4 * math.pi * fraction) / (4 * math.pi)
+        x = _crossing(eased * 56, 56, 13, direction)
+        y = 18 + (trip * 5) % 10 + int(3 * math.sin(age * .45))
+        _blit_roles(_SEAHORSE_POSES[int(age * 4) % 2],
+                    _MARINE_PALETTES[(trip + 2) % len(_MARINE_PALETTES)], x, y, pixel, direction)
+
+
 _SNAIL_ROWS = ("          EE EE ", "          EE EE ", "    HHH    S S  ",
                "   HSSSH   S S  ", "  HSDDSDH  SSS  ", "  HSDSDSHSSSSSS ",
                "   HSSSHTSTSTSTS", "    HHHTTTTTTTTT", "     TTTTTTTTTT ")
@@ -330,6 +402,7 @@ def _ornament_layout(seconds):
 def extra_life(t, pixel, night=False):
     """Small cached sprites; visitors have independent, sparse schedules."""
     guided_fish(t, pixel)
+    marine_visitors(t, pixel)
     # Two residents cross completely before changing direction.
     for i, sprite in enumerate((_GREEN_FISH, _GOLDFISH)):
         clock = t + i * 23
@@ -397,7 +470,9 @@ def extra_life(t, pixel, night=False):
             def shell_pixel(x, y, index):
                 if _ORNAMENT_DITHER[y & 3][x & 3] < opacity:
                     pixel(x, y, index)
-        _blit(_SHELL, shell_x, 51, shell_pixel, direction)
+        trip = int((t - 350) // 540)
+        shell = _HERMIT_SHELLS[trip % len(_HERMIT_SHELLS)]
+        _blit(shell, shell_x, 51, shell_pixel, direction)
         if 12 <= age < 29:
             crab_x = home - direction * int((29 - age) * 5)
             _blit(_HERMIT_BODY, crab_x, 55, pixel, direction)
@@ -936,6 +1011,8 @@ def load_backgrounds(path="backgrounds.bin"):
             frames = []
             digest = hashlib.sha256()
             for _ in range(4):
+                # Release temporary allocations before each contiguous frame.
+                gc.collect()
                 frame = source.read(WIDTH * HEIGHT)
                 if len(frame) != WIDTH * HEIGHT or max(frame) >= len(BASE_PALETTE):
                     raise ValueError("Invalid background pixels")
@@ -1413,18 +1490,18 @@ def render(seconds, pixel, night=False, submarine_at=None, submarine_direction=N
             for dx, dy in ((-6, -4), (-5, -4), (-6, -3), (-5, -3)):
                 angler_pixel(dx, dy, PEARL_CORE)
             angler_pixel(-6, -3, 28)
-            # Curved stalk reaches forward of the mouth. A three-pixel
-            # lantern pulses while a faint halo breathes around it.
+            # Curved stalk reaches forward to a warm luminous bulb.
             for dx, dy in ((-2, -7), (-2, -9), (-3, -11),
                            (-5, -12), (-7, -12), (-9, -11)):
                 angler_pixel(dx, dy, 46)
-            glow = 55 if int(t * 3) & 1 else 57
-            angler_pixel(-10, -11, glow)
-            angler_pixel(-11, -11, 55)
-            angler_pixel(-10, -12, 27)
-            if int(t * 2) & 1:
-                angler_pixel(-12, -11, 25)
-                angler_pixel(-10, -13, 25)
+            # A slightly larger warm 3x3 bulb with a white core and soft halo.
+            glow = TREASURE_GLOW if int(t * 2) & 1 else 57
+            for dx, dy in ((-12, -11), (-8, -11), (-10, -13), (-10, -9)):
+                angler_pixel(dx, dy, PEARL_HALO)
+            for dy in range(-12, -9):
+                for dx in range(-11, -8):
+                    angler_pixel(dx, dy, PEARL_CORE if (dx, dy) == (-10, -11) else glow)
+
 
 
     # Submarine: automatic cameo every three minutes, or S to summon.
@@ -1512,4 +1589,3 @@ def render(seconds, pixel, night=False, submarine_at=None, submarine_direction=N
             pixel(x, y, 57 if phase in (1, 2) else 59)
             if i % 3 == 0 and phase in (2, 3) and x + 1 < WIDTH:
                 pixel(x + 1, y, 59)
-
