@@ -52,3 +52,8 @@ installation; the offline build still needs its own physical acceptance checks.
 The existing `backgrounds.bin` remains compatible. To update an existing offline
 installation from this version, copy `aquarium.py` and `runtime.py` over USB, then
 reset. No Wi-Fi, NTP, dashboard or remote updater is included.
+
+The sea snail is drawn in front of the opening oyster and other bottom visitors.
+Hermit shells retain shaded coloured fills, with emissive coloured edges that
+stay bright at night. These changes require only `aquarium.py`; the existing
+background asset remains compatible.

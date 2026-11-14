@@ -44,6 +44,38 @@ class AquariumTests(unittest.TestCase):
                 i in (a.PEARL_CORE, a.TREASURE_GLOW, 57)]
         self.assertGreaterEqual(len(bulb), 9)
 
+    def test_snail_is_in_front_of_open_oyster_in_both_directions(self):
+        import aquarium as a
+        from unittest.mock import patch
+        original = a._blit
+        for trip in (0, 1):
+            # Force the open oyster into the snail's path and ensure its
+            # final pixels survive, rather than merely checking call order.
+            t = 265 + trip * 610 + 55
+            x = a._crossing(55, 115, 18, 1 if trip == 0 else -1)
+            result, snail = {}, {}
+            def blit(sprite, px, py, pixel, direction=1):
+                if any(sprite is pose for pose in a._SNAIL_EYE_POSES):
+                    def trace(xx, yy, colour):
+                        snail[xx, yy] = colour
+                        pixel(xx, yy, colour)
+                    return original(sprite, px, py, trace, direction)
+                return original(sprite, px, py, pixel, direction)
+            with patch.object(a, '_blit', blit), \
+                 patch.object(a, '_opening_pose', return_value=3), \
+                 patch.object(a, '_ornament_layout', return_value=(40, x, 16)):
+                a.extra_life(t, lambda xx, yy, i: result.__setitem__((xx, yy), i))
+            self.assertTrue(snail)
+            self.assertTrue(all(result[position] == colour for position, colour in snail.items()))
+
+    def test_all_hermit_shell_edges_remain_bright_at_night(self):
+        import aquarium as a
+        day, night = a.palette_at(0), a.palette_at(0, True)
+        for body, edge, shadow in a._HERMIT_SHELL_PALETTES:
+            self.assertEqual(day[edge], night[edge])
+            self.assertNotEqual(body, edge)
+            self.assertNotEqual(shadow, edge)
+
     def test_bubbles_have_independent_fixed_colour_phases(self):
         calls = []
         render(0, lambda x, y, i: calls.append((x, y, i)), background=False)

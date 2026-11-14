@@ -173,8 +173,10 @@ _TINY_GOLD = _sprite(("T HH ", "TTBBE", "T BB "), {"T": 54, "H": 75, "B": 74, "E
 _SHELL = _sprite(("    HHHH   ", "  HHSSSSHH ", " HSSDDSSSH ", " HSDSSDSDSH",
                   " HSDSSDSSH ", "  HSSSSSH  ", "   HHHHH   "),
                  {"H": 75, "S": 74, "D": 58})
-_HERMIT_SHELL_PALETTES = ((74, 75, 58), (72, 73, 36), (70, 71, 59),
-                           (76, 77, 72), (78, 79, 10), (56, 57, 58))
+# Emissive edge colours stay luminous at night; coloured fills retain shading.
+# Reuse existing palette entries and masks rather than adding glow buffers.
+_HERMIT_SHELL_PALETTES = ((74, 57, 58), (72, 73, 36), (70, 71, 59),
+                           (76, 49, 72), (78, 55, 10), (56, 57, 58))
 _HERMIT_SHELLS = tuple(bytes((body if value == 74 else light if value == 75 else
                               shadow if value == 58 else value) if at % 3 == 2 else value
                              for at, value in enumerate(_SHELL))
@@ -430,16 +432,6 @@ def extra_life(t, pixel, night=False):
             y += int(math.sin(t * 1.2 + i * 1.7))
             _blit(_TINY_GOLD if family else _TINY_FISH, x - direction * lag, y, pixel, direction)
 
-    # A quiet snail passes independently of the crab and hermit encounter.
-    age = (t - 265) % 610
-    if age < 115:
-        direction = 1 if int((t - 265) // 610) % 2 == 0 else -1
-        x = _crossing(age, 115, 18, direction)
-        # Advance pupils with each pixel of travel rather than flickering
-        # them on every display refresh while the snail is stationary.
-        eye_pose = int(age * (WIDTH + 36) / 115) % 4
-        _blit(_SNAIL_EYE_POSES[eye_pose], x - direction, 48, pixel, direction)
-
     # The large oyster occupies the former skull clearing; the pearl stays luminous at night.
     age = (t - 90) % 95
     pose = _opening_pose(age, 8, 12, 29, 33)
@@ -489,6 +481,17 @@ def extra_life(t, pixel, night=False):
         x = _crossing(eased * 60, 60, 15, direction)
         y = 46 + int(math.sin(age * .5))
         _blit(_GHOST_POSES[_ghost_pose(age)], x, y, pixel, direction)
+
+    # Draw the snail last so opening ornaments cannot cover its shell or eyes.
+    age = (t - 265) % 610
+    if age < 115:
+        direction = 1 if int((t - 265) // 610) % 2 == 0 else -1
+        x = _crossing(age, 115, 18, direction)
+        # Advance pupils with each pixel of travel rather than flickering
+        # them on every display refresh while the snail is stationary.
+        eye_pose = int(age * (WIDTH + 36) / 115) % 4
+        _blit(_SNAIL_EYE_POSES[eye_pose], x - direction, 48, pixel, direction)
+
 
 
 _CHEST_TICK = None
