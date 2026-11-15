@@ -1063,6 +1063,43 @@ def submarine_motion(fraction, seed):
 _JELLY_PALETTES = ((70, 77, 57), (72, 79, 77), (76, 71, 75), (54, 73, 57))
 
 
+def feeding_pellet_position(pellet, feed):
+    """Shared food trajectory, also used to aim the feeding fish's mouth."""
+    age = feed - pellet * .75
+    x = 53 + (pellet * 11) % 24
+    # Assigned pellets stay in their lane, avoiding rapid pursuit reversals.
+    if not 6 <= pellet < 12:
+        x += 2 * math.sin(age * .8 + pellet)
+    return x, -2 + age * (1.45 + pellet % 3 * .25)
+
+
+def feeding_fish_pose(guest, feed):
+    """Continuous approach, follow a real pellet, bite, then depart."""
+    age = feed - guest * .9
+    if not 0 <= age < 23:
+        return None
+    facing = 1 if guest % 2 == 0 else -1
+    entry = -14 if facing == 1 else WIDTH + 14
+    pellet = guest + 6
+    target_x, target_y = feeding_pellet_position(pellet, feed)
+    if age < 9:
+        progress = age / 9
+        nose_x = entry + (target_x - facing * 3 - entry) * progress
+        nose_y = 16 + guest * 5 + (target_y - 16 - guest * 5) * progress
+    elif age < 14:
+        # Follow the falling pellet, closing the final gap for the bite.
+        gap = 3 * min(1, 14 - age)
+        nose_x, nose_y = target_x - facing * gap, target_y
+    else:
+        bite_time = 14 + guest * .9
+        bite_x, bite_y = feeding_pellet_position(pellet, bite_time)
+        progress = (age - 14) / 9
+        exit_x = WIDTH + 14 if facing == 1 else -14
+        nose_x = bite_x + (exit_x - bite_x) * progress
+        nose_y = bite_y + (30 + guest * 3 - bite_y) * progress
+    return nose_x, nose_y, facing
+
+
 def render(seconds, pixel, night=False, submarine_at=None, submarine_direction=None,
            feeding_age=None, submarine_colour=None, background=True, plants=False, ornaments=True):
     """Draw one indexed-colour frame using pixel(x, y, palette_index).
@@ -1304,37 +1341,21 @@ def render(seconds, pixel, night=False, submarine_at=None, submarine_direction=N
         for pellet in range(14):
             delay = pellet * 0.75
             age = feed - delay
-            if 0 <= age < 12 + pellet % 4:
-                px = 53 + (pellet * 11) % 24 + int(2 * math.sin(age * 0.8 + pellet))
-                py = int(-2 + age * (1.45 + pellet % 3 * 0.25))
+            eaten = 6 <= pellet < 12 and feed >= 14 + (pellet - 6) * .9
+            if 0 <= age < 12 + pellet % 4 and not eaten:
+                food_x, food_y = feeding_pellet_position(pellet, feed)
+                px, py = int(food_x), int(food_y)
                 if 0 <= px < WIDTH and 0 <= py < HEIGHT:
                     pixel(px, py, 67 if pellet % 3 else 66)
                     if pellet % 5 == 0 and py + 1 < HEIGHT:
                         pixel(px, py + 1, 65)
-        # Six additional fish approach the falling food, dart around it,
-        # then swim offscreen again without teleporting at event boundaries.
+        # Each guest follows an actual pellet; food disappears at its bite.
         for guest in range(6):
-            delay = guest * 0.9
-            age = feed - delay
-            if not (0 <= age < 23):
+            pose = feeding_fish_pose(guest, feed)
+            if pose is None:
                 continue
-            from_left = guest % 2 == 0
-            entry = -13 if from_left else WIDTH + 13
-            target = 54 + (guest * 9) % 22
-            if age < 9:
-                progress = age / 9
-                fx = int(entry + (target - entry) * progress)
-                fy = int((16 + guest * 5) + (15 - guest * 2) * progress)
-            elif age < 15:
-                fx = target + int(5 * math.sin(age * 3 + guest))
-                fy = 20 + guest * 3 + int(3 * math.sin(age * 2.5 + guest))
-            else:
-                progress = (age - 15) / 8
-                exit_x = WIDTH + 14 if from_left else -14
-                fx = int(target + (exit_x - target) * progress)
-                fy = 20 + guest * 3
-            # Fish leave in the same direction as their travel: never tail-first.
-            facing = 1 if from_left else -1
+            nose_x, nose_y, facing = pose
+            fx, fy = int(nose_x) - facing * 9, int(nose_y) - 2
             fish_body = (32, 36, 38, 40, 34, 42)[guest]
             fish_fin = (33, 37, 39, 41, 35, 43)[guest]
             for dy in range(5):

@@ -76,6 +76,41 @@ class AquariumTests(unittest.TestCase):
             self.assertNotEqual(body, edge)
             self.assertNotEqual(shadow, edge)
 
+    def test_feeding_guests_follow_food_and_have_continuous_paths(self):
+        import aquarium as a
+        for guest in range(6):
+            delay = guest * .9
+            self.assertIsNone(a.feeding_fish_pose(guest, delay - .01))
+            self.assertIsNone(a.feeding_fish_pose(guest, delay + 23))
+            for age in (9, 11, 13, 13.5, 14):
+                x, y, facing = a.feeding_fish_pose(guest, delay + age)
+                food_x, food_y = a.feeding_pellet_position(guest + 6, delay + age)
+                self.assertAlmostEqual(y, food_y)
+                self.assertLessEqual(abs(x - food_x), 3)
+                if age == 14:
+                    self.assertAlmostEqual(x, food_x)
+            for boundary in (9, 13, 14):
+                before = a.feeding_fish_pose(guest, delay + boundary - .001)
+                after = a.feeding_fish_pose(guest, delay + boundary + .001)
+                self.assertLess(abs(after[0] - before[0]), .1)
+                self.assertLess(abs(after[1] - before[1]), .1)
+
+    def test_bitten_pellets_disappear_at_contact(self):
+        import aquarium as a
+        from unittest.mock import patch
+        # Isolate the food pass: guests and unrelated scenery are suppressed.
+        for guest in range(6):
+            bite = 14 + guest * .9
+            for delta, visible in ((-.01, True), (.01, False)):
+                feed = bite + delta
+                x, y = a.feeding_pellet_position(guest + 6, feed)
+                calls = []
+                with patch.object(a, 'feeding_fish_pose', return_value=None):
+                    a.render(0, lambda xx, yy, i: calls.append((xx, yy, i)),
+                             feeding_age=feed, background=False, ornaments=False)
+                self.assertEqual((int(x), int(y), 67 if (guest + 6) % 3 else 66) in calls,
+                                 visible)
+
     def test_bubbles_have_independent_fixed_colour_phases(self):
         calls = []
         render(0, lambda x, y, i: calls.append((x, y, i)), background=False)

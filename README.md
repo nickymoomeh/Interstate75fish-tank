@@ -57,3 +57,8 @@ The sea snail is drawn in front of the opening oyster and other bottom visitors.
 Hermit shells retain shaded coloured fills, with emissive coloured edges that
 stay bright at night. These changes require only `aquarium.py`; the existing
 background asset remains compatible.
+
+Feeding guests now approach and follow individual falling pellets, close the gap
+for a bite, then depart continuously. Assigned pellets disappear at mouth contact.
+The :15/:45 schedule and 28-second event duration are unchanged. The emulator
+uses the same movement; press F to preview feeding without waiting for a slot.
